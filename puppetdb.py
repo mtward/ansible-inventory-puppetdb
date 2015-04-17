@@ -157,20 +157,24 @@ class PuppetdbInventory(object):
         for node in self.puppetdb.nodes():
             server = str(node)
 
-            if group_by is not None:
-                try:
-                    fact_value = node.fact(group_by).value
-                    if fact_value not in groups:
-                        groups[fact_value]['hosts'] = list()
-                    groups[fact_value]['hosts'].append(server)
-                except StopIteration:
-                    # This fact does not exist on the server
-                    if 'unknown' not in groups:
-                        groups['unknown']['hosts'] = list()
-                    groups['unknown']['hosts'].append(server)
+            facts = self.fetch_host_facts(server)
+            if group_by:
+                for fact_name in group_by:
+                    if fact_name in facts and facts[fact_name]:
+                        fact_value = facts[fact_name]
+                        group_key= '%s_%s' % (fact_name,fact_value)
+                        if group_key not in groups:
+                           groups[group_key]['hosts'] = list()
+                        groups[group_key]['hosts'].append(server)
+                    else:
+                        # This fact does not exist on the server
+                        group_key = '%s__unknown' % fact_name
+                        if group_key not in groups:
+                            groups[group_key]['hosts'] = list()
+                        groups[group_key]['hosts'].append(server)
 
             groups['all']['hosts'].append(server)
-            hostvars[server] = self.fetch_host_facts(server)
+            hostvars[server] = facts
             groups['_meta'] = {'hostvars': hostvars}
 
         return json.dumps(groups)
